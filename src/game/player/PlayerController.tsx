@@ -76,6 +76,16 @@ const WALL_SKIN = 0.05
 const WALL_PROBE_RADIUS = PLAYER.CAPSULE_RADIUS
 
 /**
+ * Minimum time the character stays airborne after jumping, in seconds.
+ *
+ * The full arc lasts `2 * JUMP_VELOCITY / |GRAVITY|` ≈ 0.56 s. This is a
+ * fraction of that — enough to decide "airborne" on wall-clock time rather than
+ * on a velocity that a single long frame can reverse, but short enough that a
+ * jump onto a low ledge still lands on time and a jump off one still registers.
+ */
+const JUMP_LOCKOUT = 0.18
+
+/**
  * Where the ground ray starts, relative to the capsule's centre, in units.
  *
  * Above the capsule rather than at its centre: a ray cast from inside the
@@ -121,6 +131,20 @@ export function PlayerController() {
   const heading = useRef(0)
   const verticalVelocity = useRef(0)
   const grounded = useRef(true)
+  /**
+   * Seconds left of a forced airborne state after a jump.
+   *
+   * Velocity alone cannot say "airborne" reliably: on a long frame — a stall, a
+   * tab regaining focus, a hitch in a headless renderer — gravity is applied in
+   * one step large enough to reverse the upward velocity, the ground ray still
+   * finds the floor beneath the barely-risen body, and the character is grounded
+   * again the very next frame. With the jump key held, that re-arms the jump and
+   * stacks velocity until the player leaves the world.
+   *
+   * A short timer is frame-rate independent: after a jump the character is
+   * airborne for a fixed wall-clock minimum no matter how the frames fall.
+   */
+  const jumpLockout = useRef(0)
   const currentState = useRef<CharacterState>('idle')
   const oneShotUntil = useRef(0)
 
@@ -262,7 +286,9 @@ export function PlayerController() {
      * tolerance) below, which is what keeps a standing character from flickering
      * between grounded and not on a floating-point boundary. */
     grounded.current =
-      floorStandHeight !== null && verticalVelocity.current <= 0
+      floorStandHeight !== null &&
+      verticalVelocity.current <= 0 &&
+      jumpLockout.current <= 0
     ;(window as unknown as { __cqG?: unknown }).__cqG = {
       y: Math.round(translation.y * 100) / 100,
       toi: hit ? Math.round(hit.timeOfImpact * 100) / 100 : null,
@@ -451,10 +477,17 @@ export function PlayerController() {
     playerTransform.wallLimit = wallLimit
 
     /* Jump and gravity. */
+    if (jumpLockout.current > 0) jumpLockout.current = Math.max(0, jumpLockout.current - delta)
+
     const wantsJump = !blocked && inputState.consumePress('jump')
     if (wantsJump && grounded.current) {
       verticalVelocity.current = PLAYER.JUMP_VELOCITY
       grounded.current = false
+      /* Long enough to clear the ground ray's reach even on a slow frame, so the
+         character is unambiguously in the air before grounding is reconsidered. */
+      jumpLockout.current = JUMP_LOCKOUT
+      ;(window as unknown as { __cqJumps?: number }).__cqJumps =
+        ((window as unknown as { __cqJumps?: number }).__cqJumps ?? 0) + 1
     }
 
     if (!grounded.current) {
