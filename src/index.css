@@ -1,0 +1,226 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   Computer Quest design tokens.
+   The UI should read as a game HUD, not a dashboard (spec §35): rounded
+   panels, subtle transparency, one accent, effects used selectively.
+--------------------------------------------------------------------------- */
+@theme {
+  --color-cq-night: #0b1220;
+  --color-cq-deep: #131c31;
+  --color-cq-panel: #1c2740;
+  --color-cq-edge: #2f3d5c;
+
+  --color-cq-ink: #f2f6ff;
+  --color-cq-muted: #a3b2d1;
+
+  --color-cq-accent: #38bdf8;
+  --color-cq-accent-deep: #0ea5e9;
+  --color-cq-gold: #fbbf24;
+  --color-cq-good: #4ade80;
+  --color-cq-warn: #fb923c;
+  --color-cq-bad: #f87171;
+
+  --font-display: 'Baloo 2', 'Nunito', ui-rounded, system-ui, sans-serif;
+  --font-body: 'Nunito', ui-rounded, system-ui, sans-serif;
+
+  --radius-panel: 1.25rem;
+}
+
+/* Accessibility: adjustable text size (spec §32). Scaling the root font size
+   scales every rem-based dimension in the UI at once. */
+:root {
+  --cq-text-scale: 1;
+  color-scheme: dark;
+}
+
+html {
+  font-size: calc(16px * var(--cq-text-scale));
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--color-cq-night);
+  color: var(--color-cq-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  /* Stop iOS Safari from rubber-banding the whole page during play. */
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+/* High-contrast mode (spec §32). */
+html[data-contrast='high'] {
+  --color-cq-panel: #000000;
+  --color-cq-deep: #000000;
+  --color-cq-edge: #ffffff;
+  --color-cq-ink: #ffffff;
+  --color-cq-muted: #e6ecff;
+}
+
+/* Reduced motion (spec §32). Kills decorative animation but keeps the game
+   readable — we never remove a state change, only its easing. */
+html[data-motion='reduced'] *,
+html[data-motion='reduced'] *::before,
+html[data-motion='reduced'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion='full']) *,
+  html:not([data-motion='full']) *::before,
+  html:not([data-motion='full']) *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Reusable HUD primitives
+--------------------------------------------------------------------------- */
+@utility cq-panel {
+  background: color-mix(in oklab, var(--color-cq-panel) 88%, transparent);
+  border: 1px solid color-mix(in oklab, var(--color-cq-edge) 70%, transparent);
+  border-radius: var(--radius-panel);
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 10px 30px -12px rgb(0 0 0 / 0.6),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.05);
+}
+
+@utility cq-panel-solid {
+  background: var(--color-cq-panel);
+  border: 1px solid var(--color-cq-edge);
+  border-radius: var(--radius-panel);
+  box-shadow: 0 16px 40px -12px rgb(0 0 0 / 0.7);
+}
+
+/* A single reusable call-to-action, used by menu and dialogue alike. */
+@utility cq-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.7rem 1.6rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+  border: 1px solid transparent;
+}
+
+@utility cq-button-primary {
+  background: linear-gradient(
+    180deg,
+    var(--color-cq-accent) 0%,
+    var(--color-cq-accent-deep) 100%
+  );
+  color: #04121f;
+}
+
+@utility cq-button-ghost {
+  background: color-mix(in oklab, var(--color-cq-panel) 70%, transparent);
+  border-color: var(--color-cq-edge);
+  color: var(--color-cq-ink);
+}
+
+.cq-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.cq-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.cq-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Visible focus ring for keyboard navigation (spec §32). */
+:where(button, a, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-cq-accent);
+  outline-offset: 3px;
+  border-radius: 0.5rem;
+}
+
+@keyframes cq-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility cq-rise {
+  animation: cq-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes cq-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility cq-pop {
+  animation: cq-pop 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes cq-shimmer {
+  0% {
+    background-position: -160% 0;
+  }
+  100% {
+    background-position: 260% 0;
+  }
+}
+
+@utility cq-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgb(255 255 255 / 0.18) 50%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  animation: cq-shimmer 1.6s linear infinite;
+}
+
+@keyframes cq-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@utility cq-bob {
+  animation: cq-bob 2.4s ease-in-out infinite;
+}
